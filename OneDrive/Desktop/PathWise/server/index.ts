@@ -42,7 +42,7 @@ app.get('/api/health', async (_req, res) => {
     geminiConfigured,
     dbConnected,
     databaseType: getDatabaseType(),
-    geminiModel: 'gemini-3.6-flash',
+    geminiModel: 'gemini-2.5-flash',
     timestamp: new Date().toISOString()
   });
 });
@@ -94,7 +94,7 @@ app.post('/api/generate-path', async (req, res) => {
       stages
     };
 
-    // Commit to PostgreSQL
+    // Commit to SQLite / Supabase
     if (isDatabaseConnected()) {
       await dbSaveUser(userToSave);
       await dbSaveLearningPath(learningPath, generatedCourses);
@@ -203,7 +203,7 @@ app.post('/api/adapt-path', async (req, res) => {
       feedback
     );
 
-    // Save update to PostgreSQL
+    // Save update to SQLite / Supabase
     if (isDatabaseConnected()) {
       await dbSaveUser(updatedUser);
       const allCourses = await dbGetAllCourses();
@@ -272,13 +272,13 @@ app.get('/api/courses', async (_req, res) => {
 // Start Server
 // ---------------------------------------------------------------------------
 async function start() {
-  console.log('🔄 Initializing PostgreSQL database connection...');
+  console.log('🔄 Initializing SQLite / Supabase database connection...');
   await initializeDatabase();
 
   app.listen(PORT, () => {
     console.log(`🚀 PathWise Backend Server running on http://localhost:${PORT}`);
     console.log(`🔑 Gemini Key Configured: ${isGeminiKeyConfigured() ? 'YES' : 'NO (Check .env)'}`);
-    console.log(`🗄️  PostgreSQL Connected: ${isDatabaseConnected() ? 'YES' : 'NO'}`);
+    console.log(`🗄️  Database Connected (${getDatabaseType()}): ${isDatabaseConnected() ? 'YES' : 'NO'}`);
   });
 }
 

@@ -151,7 +151,7 @@ export default function Onboarding({ onComplete, onBackToWelcome }: OnboardingPr
       // Live Gemini API call to synthesize bespoke curriculum
       const result = await generateLearningPathAPI(finalProfile);
 
-      // Transition to main dashboard & roadmap with real PostgreSQL/Gemini data
+      // Transition to main dashboard & roadmap with SQLite / Supabase data
       onComplete(result.user, result.learningPath, result.generatedCourses);
     } catch (err: any) {
       console.error('Roadmap generation failed:', err);
@@ -185,7 +185,7 @@ export default function Onboarding({ onComplete, onBackToWelcome }: OnboardingPr
               <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                 PathWise <span className="text-[10px] uppercase font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">Live Gemini AI Intake</span>
               </h1>
-              <p className="text-xs text-slate-400">100% Live Gemini API • Real PostgreSQL Persistence</p>
+              <p className="text-xs text-slate-400">100% Live Gemini API • SQLite / Supabase Persistence</p>
             </div>
           </div>
         </div>

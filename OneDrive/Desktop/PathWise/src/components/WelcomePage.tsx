@@ -60,7 +60,7 @@ export default function WelcomePage({
             {/* DB Health Pill */}
             <div className="hidden md:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-900/80 text-slate-400">
               <Database className="h-3.5 w-3.5 text-cyan-400" />
-              <span>{isDbReady ? 'PostgreSQL Active' : 'DB Connecting'}</span>
+              <span>{isDbReady ? 'SQLite / Supabase Active' : 'DB Connecting'}</span>
             </div>
 
             {hasExistingPath && (
@@ -92,7 +92,7 @@ export default function WelcomePage({
             {/* Dynamic Pill */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-950/60 border border-indigo-700/50 text-indigo-300 text-xs font-medium backdrop-blur-md shadow-inner">
               <Sparkles className="h-3.5 w-3.5 text-cyan-400 animate-spin-slow" />
-              <span>100% Live Gemini API • Real PostgreSQL Backend</span>
+              <span>100% Live Gemini API • SQLite / Supabase Backend</span>
             </div>
 
             {/* Main Headline */}
@@ -105,7 +105,7 @@ export default function WelcomePage({
 
             {/* Subtitle */}
             <p className="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal">
-              No pre-written static templates. PathWise conducts an interactive, open-ended intake using live Gemini 2.0 API calls, synthesizes tailored multi-stage curricula for any domain on the fly, and persists everything to a real PostgreSQL database.
+              No pre-written static templates. PathWise conducts an interactive, open-ended intake using live Gemini 2.0 API calls, synthesizes tailored multi-stage curricula for any domain on the fly, and persists everything to a zero-config SQLite / Supabase database.
             </p>
 
             {/* CTA Buttons */}
@@ -127,7 +127,7 @@ export default function WelcomePage({
               </div>
               <div className="flex items-center gap-2">
                 <Database className="h-4 w-4 text-cyan-400" />
-                <span>Real PostgreSQL Persistence</span>
+                <span>SQLite / Supabase Persistence</span>
               </div>
               <div className="flex items-center gap-2">
                 <Cpu className="h-4 w-4 text-indigo-400" />
@@ -208,7 +208,7 @@ export default function WelcomePage({
                 <div className="bg-slate-900/60 rounded-xl p-3 border border-slate-800/80 space-y-2">
                   <div className="flex justify-between text-[11px]">
                     <span className="text-slate-400 flex items-center gap-1.5">
-                      <Clock className="h-3 w-3 text-cyan-400" /> PostgreSQL Persistence
+                      <Clock className="h-3 w-3 text-cyan-400" /> SQLite Persistence
                     </span>
                     <span className="text-emerald-400 font-bold">100% Live Call</span>
                   </div>
@@ -258,7 +258,7 @@ export default function WelcomePage({
               <div className="w-12 h-12 rounded-2xl bg-cyan-950/80 border border-cyan-800/50 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition duration-300">
                 <Database className="h-6 w-6 text-cyan-300" />
               </div>
-              <h3 className="text-lg font-bold text-white">PostgreSQL Data Layer</h3>
+              <h3 className="text-lg font-bold text-white">SQLite / Supabase Data Layer</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
                 Learner records, custom course catalogs, milestones, and item completion statuses are safely stored in relational database tables.
               </p>
@@ -283,7 +283,7 @@ export default function WelcomePage({
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-indigo-400" />
-            <span>PathWise AI • Powered live by Google Gemini 2.0 Flash & PostgreSQL</span>
+            <span>PathWise AI • Powered live by Google Gemini 2.0 Flash & SQLite / Supabase</span>
           </div>
           <div className="flex gap-6">
             <button onClick={onStartOnboarding} className="hover:text-slate-300 transition cursor-pointer">

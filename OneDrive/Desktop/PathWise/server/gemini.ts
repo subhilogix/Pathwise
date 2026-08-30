@@ -3,17 +3,22 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+function isPlaceholderKey(key?: string): boolean {
+  if (!key) return true;
+  const k = key.trim().toLowerCase();
+  return k === '' || k === 'your_gemini_api_key_here' || k.startsWith('your_gemini_api_key');
+}
+
 function getGeminiClient(): GoogleGenerativeAI {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
-    throw new Error('GEMINI_API_KEY is not configured on the backend server. Please set your valid Gemini API key in .env');
+  if (isPlaceholderKey(apiKey)) {
+    throw new Error('GEMINI_API_KEY is not configured in .env. Please set your valid Gemini API key in .env (e.g. GEMINI_API_KEY=AIzaSy...)');
   }
-  return new GoogleGenerativeAI(apiKey);
+  return new GoogleGenerativeAI(apiKey!);
 }
 
 export function isGeminiKeyConfigured(): boolean {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  return !!apiKey && apiKey !== 'YOUR_GEMINI_API_KEY_HERE';
+  return !isPlaceholderKey(process.env.GEMINI_API_KEY);
 }
 
 export interface ChatMessageParam {

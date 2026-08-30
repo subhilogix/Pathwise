@@ -71,7 +71,7 @@ export default function ProfileSettings({
             Learning Profile & Backend Configuration
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Adjust your pace, experience level, goal targets, and review PostgreSQL database state.
+            Adjust your pace, experience level, goal targets, and review SQLite (pathwise.db) / Supabase database state.
           </p>
         </div>
 
@@ -217,7 +217,7 @@ export default function ProfileSettings({
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
               Completely trigger a fresh live Gemini generation for your goal. 
-              Warning: This will overwrite your current stages in PostgreSQL and reset item completions.
+              Warning: This will overwrite your current stages in the database and reset item completions.
             </p>
             <button
               onClick={onRegeneratePath}
@@ -231,7 +231,7 @@ export default function ProfileSettings({
           <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 space-y-4">
             <h3 className="text-base font-bold text-white">Database Course Catalog</h3>
             <p className="text-xs text-slate-400">
-              Toggle courses completed elsewhere to update PostgreSQL and unlock downstream prerequisites.
+              Toggle courses completed elsewhere to update SQLite / Supabase and unlock downstream prerequisites.
             </p>
 
             <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1 scrollbar-thin">

@@ -336,6 +336,16 @@ export async function dbSaveLearningPath(path: any, courses: any[]): Promise<voi
   });
 
   tx();
+
+  // If Supabase is connected, sync learning path as well
+  if (supabase) {
+    supabase.from('learning_paths').upsert({
+      id: path.id,
+      user_id: path.user_id,
+      goal_snapshot: path.goal_snapshot,
+      generated_at: path.generated_at || new Date().toISOString()
+    }).then();
+  }
 }
 
 export async function dbGetLearningPath(userId: string): Promise<any | null> {
@@ -418,20 +428,38 @@ export async function dbUpdateItemStatus(userId: string, courseId: string, newSt
   });
 
   tx();
+
+  if (supabase) {
+    supabase.from('path_items').update({ status: newStatus }).match({ course_id: courseId }).then();
+  }
 }
 
 export async function dbLogFeedback(event: any): Promise<void> {
+  const evtId = event.id || `evt-${Date.now()}`;
+  const timestamp = event.timestamp || new Date().toISOString();
+
   sqlite.prepare(`
     INSERT INTO feedback_events (id, user_id, path_item_id, feedback_type, timestamp, resulting_action)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(
-    event.id || `evt-${Date.now()}`,
+    evtId,
     event.user_id,
     event.path_item_id,
     event.feedback_type,
-    event.timestamp || new Date().toISOString(),
+    timestamp,
     event.resulting_action
   );
+
+  if (supabase) {
+    supabase.from('feedback_events').upsert({
+      id: evtId,
+      user_id: event.user_id,
+      path_item_id: event.path_item_id,
+      feedback_type: event.feedback_type,
+      timestamp,
+      resulting_action: event.resulting_action
+    }).then();
+  }
 }
 
 export async function dbGetFeedbackLogs(userId: string): Promise<any[]> {

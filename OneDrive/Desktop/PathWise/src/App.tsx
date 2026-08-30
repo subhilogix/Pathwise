@@ -36,7 +36,7 @@ export default function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  // Check health and load saved user from PostgreSQL on startup
+  // Check health and load saved user from SQLite / Supabase on startup
   useEffect(() => {
     async function init() {
       try {
@@ -60,7 +60,7 @@ export default function App() {
             return;
           }
         } catch (err) {
-          console.warn('Failed to load user from PostgreSQL:', err);
+          console.warn('Failed to load user from database:', err);
         }
       }
 
@@ -115,7 +115,7 @@ export default function App() {
     if (!user || !learningPath) return;
 
     try {
-      // 1. Send update to PostgreSQL backend
+      // 1. Send update to SQLite / Supabase backend
       await updateItemStatusAPI(itemId, user.id, newStatus);
 
       let updatedCompleted = [...user.completed_courses];
@@ -276,7 +276,7 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 PathWise <span className="text-[10px] bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full font-normal">Gemini Live</span>
               </h1>
-              <p className="text-[10px] text-slate-400">PostgreSQL Backed • Live AI Engine</p>
+              <p className="text-[10px] text-slate-400">SQLite / Supabase Backed • Live AI Engine</p>
             </div>
           </div>
 
@@ -396,7 +396,7 @@ export default function App() {
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Database className="h-4 w-4 text-cyan-400" />
-            <span>PathWise • Live Gemini 2.0 API & PostgreSQL Architecture</span>
+            <span>PathWise • Live Gemini 2.0 API & SQLite / Supabase Architecture</span>
           </div>
           <div className="flex gap-4">
             <button onClick={() => setCurrentView('welcome')} className="hover:text-slate-400 transition cursor-pointer">
