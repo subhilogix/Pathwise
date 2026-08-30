@@ -1,503 +1,443 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Sparkles, User as UserIcon, BookOpen, Clock, Activity, ArrowRight } from 'lucide-react';
-import type { User, ExperienceLevel } from '../types';
-import { parseGoalWithAI } from '../engine';
-
+import { 
+  Send, 
+  Sparkles, 
+  User as UserIcon, 
+  Clock, 
+  ArrowRight, 
+  Compass, 
+  Brain, 
+  RefreshCw,
+  Zap,
+  ArrowLeft,
+  AlertTriangle
+} from 'lucide-react';
+import type { User, LearningPath, Course } from '../types';
+import { sendChatMessage, generateLearningPathAPI } from '../services/apiClient';
 
 interface OnboardingProps {
-  onComplete: (user: User) => void;
+  onComplete: (user: User, generatedPath: LearningPath, generatedCourses: Course[]) => void;
+  onBackToWelcome?: () => void;
 }
 
-interface Message {
+interface DisplayMessage {
+  id: string;
   sender: 'ai' | 'user';
   text: string;
   options?: string[];
-  field?: 'goal' | 'experience' | 'time' | 'interests';
+  timestamp: Date;
 }
 
-export default function Onboarding({ onComplete }: OnboardingProps) {
-  const [messages, setMessages] = useState<Message[]>([
+export default function Onboarding({ onComplete, onBackToWelcome }: OnboardingProps) {
+  const [messages, setMessages] = useState<DisplayMessage[]>([
     {
+      id: 'welcome-1',
       sender: 'ai',
-      text: "Hello! I'm your PathWise learning companion. What are you hoping to learn, build, or achieve? (e.g., 'I want to build full stack web apps in React', 'I want to learn machine learning with Python')"
+      text: "Hello! I'm your **PathWise AI Learning Architect** powered live by Gemini. Tell me: **What are you hoping to learn, build, or achieve?** (e.g. *'I want to build full stack apps with Next.js'*, *'I am a mechanical engineer with basic Python and want to learn 3D Game Dev with Godot and C#'*, or *'I want to learn LLM fine-tuning & RAG in 4 months'*).",
+      options: [
+        'Build Full-Stack Web Apps with React & Node',
+        'Learn AI / Machine Learning & LLM Agents',
+        'Game Development with Godot & C#',
+        'Cloud Architecture & DevOps with Docker & AWS'
+      ],
+      timestamp: new Date()
     }
   ]);
+
   const [inputValue, setInputValue] = useState('');
-  const [step, setStep] = useState(0);
+  const [isTyping, setIsTyping] = useState(false);
+  const [isGeneratingPath, setIsGeneratingPath] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Profile data being built in real-time
-  const [profile, setProfile] = useState<Partial<User>>({
+  // Profile data being dynamically synthesized
+  const [profile, setProfile] = useState<User>({
+    id: `user-${Date.now()}`,
     name: 'Learner',
     email: 'learner@pathwise.edu',
     goal: '',
+    goal_tags: ['Software Engineering'],
     experience_level: 'beginner',
     time_budget_hours_per_week: 10,
     interests: [],
-    goal_tags: ['Web Dev'],
     completed_courses: [],
     skill_vector: []
   });
 
-  const [showManualForm, setShowManualForm] = useState(false);
-
   // Scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isTyping]);
 
-  const handleSend = (text: string) => {
-    if (!text.trim()) return;
+  const handleSend = async (textToSend?: string) => {
+    const messageText = (textToSend || inputValue).trim();
+    if (!messageText || isTyping || isGeneratingPath) return;
+
+    setErrorMessage(null);
 
     // Add user message
-    const newMessages = [...messages, { sender: 'user' as const, text }];
-    setMessages(newMessages);
-    setInputValue('');
-
-    // Process step
-    setTimeout(() => {
-      processNextStep(text, newMessages);
-    }, 800);
-  };
-
-  const processNextStep = (userText: string, currentMessages: Message[]) => {
-    const nextStep = step + 1;
-    setStep(nextStep);
-
-    if (step === 0) {
-      // 1. Goal Input
-      const parsed = parseGoalWithAI(userText);
-      setProfile(prev => ({
-        ...prev,
-        goal: userText,
-        goal_tags: [parsed.inferredDomain],
-        experience_level: parsed.experienceLevel,
-        time_budget_hours_per_week: parsed.timeBudget,
-        interests: parsed.interests
-      }));
-
-      setMessages([
-        ...currentMessages,
-        {
-          sender: 'ai',
-          text: `Got it! A path in "${parsed.inferredDomain}" sounds exciting. What is your current experience level in this area?`,
-          options: ['Beginner (No coding background)', 'Intermediate (Know syntax, built small projects)', 'Advanced (Experienced developer looking to pivot/learn advanced topics)'],
-          field: 'experience'
-        }
-      ]);
-    } else if (step === 1) {
-      // 2. Experience Level
-      let level: ExperienceLevel = 'beginner';
-      if (userText.toLowerCase().includes('intermediate')) level = 'intermediate';
-      if (userText.toLowerCase().includes('advanced')) level = 'advanced';
-
-      setProfile(prev => ({ ...prev, experience_level: level }));
-
-      setMessages([
-        ...currentMessages,
-        {
-          sender: 'ai',
-          text: "Excellent. How many hours per week can you realistically dedicate to this learning path?",
-          options: ['3-5 hours/week', '5-10 hours/week', '10-15 hours/week', '20+ hours/week'],
-          field: 'time'
-        }
-      ]);
-    } else if (step === 2) {
-      // 3. Time Budget
-      let hours = 10;
-      const match = userText.match(/(\d+)/);
-      if (match) {
-        hours = parseInt(match[1], 10);
-      } else if (userText.includes('3-5')) {
-        hours = 4;
-      } else if (userText.includes('5-10')) {
-        hours = 8;
-      } else if (userText.includes('10-15')) {
-        hours = 12;
-      } else if (userText.includes('20+')) {
-        hours = 25;
-      }
-
-      setProfile(prev => ({ ...prev, time_budget_hours_per_week: hours }));
-
-      // Standard topics to choose from based on domain
-      const domain = profile.goal_tags?.[0] || 'Web Dev';
-      let options = ['React', 'Backend Development', 'API Design'];
-      if (domain === 'Data Science') options = ['Data Manipulation', 'Machine Learning', 'SQL Analysis'];
-      if (domain === 'AI/ML') options = ['Deep Learning', 'Large Language Models', 'Computer Vision'];
-      if (domain === 'Cloud/DevOps') options = ['Docker & Containers', 'CI/CD Pipelines', 'AWS Deployment'];
-
-      setMessages([
-        ...currentMessages,
-        {
-          sender: 'ai',
-          text: `Perfect! What are your primary interests or specific technologies you'd like to emphasize? (Select one or type custom ones)`,
-          options,
-          field: 'interests'
-        }
-      ]);
-    } else if (step === 3) {
-      // 4. Interests
-      const currentInterests = profile.interests || [];
-      if (!currentInterests.includes(userText)) {
-        currentInterests.push(userText);
-      }
-
-      // Generate initial skill vector
-      const domain = profile.goal_tags?.[0] || 'Web Dev';
-      const initialSkills = getInitialSkills(domain, profile.experience_level || 'beginner');
-
-      setProfile(prev => ({
-        ...prev,
-        interests: currentInterests,
-        skill_vector: initialSkills
-      }));
-
-      setMessages([
-        ...currentMessages,
-        {
-          sender: 'ai',
-          text: "I've structured your profile! Click below to build your custom learning path.",
-        }
-      ]);
-    }
-  };
-
-  const getInitialSkills = (domain: string, level: ExperienceLevel) => {
-    let startingProf = 10;
-    if (level === 'intermediate') startingProf = 40;
-    if (level === 'advanced') startingProf = 70;
-
-    if (domain === 'Web Dev') {
-      return [
-        { skill: 'HTML', proficiency: Math.min(startingProf + 20, 100) },
-        { skill: 'CSS', proficiency: Math.min(startingProf + 10, 100) },
-        { skill: 'JavaScript', proficiency: startingProf },
-        { skill: 'React', proficiency: Math.max(0, startingProf - 20) },
-        { skill: 'Node.js', proficiency: Math.max(0, startingProf - 30) }
-      ];
-    } else if (domain === 'Data Science') {
-      return [
-        { skill: 'Python', proficiency: Math.min(startingProf + 25, 100) },
-        { skill: 'Statistics', proficiency: startingProf },
-        { skill: 'Pandas', proficiency: Math.max(0, startingProf - 10) },
-        { skill: 'Machine Learning', proficiency: Math.max(0, startingProf - 30) }
-      ];
-    } else if (domain === 'AI/ML') {
-      return [
-        { skill: 'Python', proficiency: Math.min(startingProf + 20, 100) },
-        { skill: 'Neural Networks', proficiency: startingProf },
-        { skill: 'Deep Learning', proficiency: Math.max(0, startingProf - 20) },
-        { skill: 'LLMs', proficiency: Math.max(0, startingProf - 40) }
-      ];
-    } else {
-      return [
-        { skill: 'Linux', proficiency: Math.min(startingProf + 20, 100) },
-        { skill: 'Docker', proficiency: startingProf },
-        { skill: 'AWS', proficiency: Math.max(0, startingProf - 20) },
-        { skill: 'Kubernetes', proficiency: Math.max(0, startingProf - 40) }
-      ];
-    }
-  };
-
-  const handleFinishOnboarding = () => {
-    const finalProfile: User = {
-      id: profile.id || `user-${Date.now()}`,
-      name: profile.name || 'Learner',
-      email: profile.email || 'learner@pathwise.edu',
-      experience_level: profile.experience_level || 'beginner',
-      interests: profile.interests || [],
-      goal: profile.goal || 'Learn Web Development',
-      goal_tags: profile.goal_tags || ['Web Dev'],
-      time_budget_hours_per_week: profile.time_budget_hours_per_week || 10,
-      completed_courses: profile.completed_courses || [],
-      skill_vector: profile.skill_vector || getInitialSkills(profile.goal_tags?.[0] || 'Web Dev', profile.experience_level || 'beginner')
-    };
-    onComplete(finalProfile);
-  };
-
-  const handleManualFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const finalProfile: User = {
+    const userMsg: DisplayMessage = {
       id: `user-${Date.now()}`,
-      name: profile.name || 'Learner',
-      email: profile.email || 'learner@pathwise.edu',
-      experience_level: profile.experience_level || 'beginner',
-      interests: profile.interests || [],
-      goal: profile.goal || 'Learn Web Development',
-      goal_tags: profile.goal_tags || ['Web Dev'],
-      time_budget_hours_per_week: Number(profile.time_budget_hours_per_week) || 10,
-      completed_courses: profile.completed_courses || [],
-      skill_vector: getInitialSkills(profile.goal_tags?.[0] || 'Web Dev', profile.experience_level || 'beginner')
+      sender: 'user',
+      text: messageText,
+      timestamp: new Date()
     };
-    onComplete(finalProfile);
+
+    const newDisplayMessages = [...messages, userMsg];
+    setMessages(newDisplayMessages);
+    setInputValue('');
+    setIsTyping(true);
+
+    // If user clicked generate directly
+    if (messageText.toLowerCase().includes('generate my custom ai roadmap') || messageText.toLowerCase().includes('generate ai roadmap')) {
+      setIsTyping(false);
+      handleGenerateRoadmap();
+      return;
+    }
+
+    // Convert display messages to API format
+    const apiMessages = newDisplayMessages.map(m => ({
+      role: (m.sender === 'user' ? 'user' : 'model') as 'user' | 'model',
+      text: m.text
+    }));
+
+    try {
+      const response = await sendChatMessage(apiMessages, profile);
+
+      // Update synthesized profile with any newly detected parameters from live Gemini
+      if (response.extractedProfile) {
+        const ext = response.extractedProfile as any;
+        setProfile(prev => ({
+          ...prev,
+          goal: ext.goal || prev.goal || messageText,
+          goal_tags: ext.domain ? [ext.domain] : ext.goal_tags || prev.goal_tags,
+          experience_level: ext.experience_level || prev.experience_level,
+          time_budget_hours_per_week: ext.time_budget_hours_per_week || prev.time_budget_hours_per_week,
+          interests: ext.interests?.length ? ext.interests : prev.interests
+        }));
+      }
+
+      const aiMsg: DisplayMessage = {
+        id: `ai-${Date.now()}`,
+        sender: 'ai',
+        text: response.reply,
+        options: response.suggestedOptions,
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, aiMsg]);
+    } catch (err: any) {
+      console.error('Error during live Gemini chat:', err);
+      setErrorMessage(err.message || 'Gemini API call failed.');
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleGenerateRoadmap = async () => {
+    setErrorMessage(null);
+    setIsGeneratingPath(true);
+
+    const activeGoal = profile.goal || (messages.find(m => m.sender === 'user')?.text) || 'Master Software Engineering';
+    const activeDomain = profile.goal_tags[0] || 'Software Engineering';
+
+    const finalProfile: User = {
+      ...profile,
+      goal: activeGoal,
+      goal_tags: [activeDomain]
+    };
+
+    try {
+      // Live Gemini API call to synthesize bespoke curriculum
+      const result = await generateLearningPathAPI(finalProfile);
+
+      // Transition to main dashboard & roadmap with real PostgreSQL/Gemini data
+      onComplete(result.user, result.learningPath, result.generatedCourses);
+    } catch (err: any) {
+      console.error('Roadmap generation failed:', err);
+      setErrorMessage(err.message || 'Failed to generate curriculum with live Gemini API.');
+      setIsGeneratingPath(false);
+    }
   };
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-[#070b13] text-slate-100">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#070b13] text-slate-100 selection:bg-indigo-500 selection:text-white">
       
-      {/* LEFT PANEL: Chat intake OR Manual Form */}
-      <div className="flex-1 flex flex-col p-6 md:p-10 border-b md:border-b-0 md:border-r border-slate-800">
+      {/* LEFT CHAT / WORKSPACE PANEL */}
+      <div className="flex-1 flex flex-col p-4 sm:p-8 lg:p-10 border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-slate-950/40">
         
-        {/* Header */}
-        <div className="flex items-center justify-between pb-6 mb-4 border-b border-slate-800">
+        {/* HEADER BAR */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-6 mb-4 border-b border-slate-800/80">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/20">
-              <Sparkles className="h-6 w-6 text-cyan-300 animate-pulse" />
+            {onBackToWelcome && (
+              <button
+                onClick={onBackToWelcome}
+                className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
+                title="Back to Welcome Page"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+            )}
+            <div className="p-2.5 bg-gradient-to-tr from-indigo-600 to-cyan-500 rounded-2xl shadow-lg shadow-indigo-500/20">
+              <Sparkles className="h-5 w-5 text-white animate-pulse" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-white">PathWise <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full font-normal">AI Engine v1.0</span></h1>
-              <p className="text-xs text-slate-400">Personalized Learning Roadmap Generator</p>
+              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                PathWise <span className="text-[10px] uppercase font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">Live Gemini AI Intake</span>
+              </h1>
+              <p className="text-xs text-slate-400">100% Live Gemini API • Real PostgreSQL Persistence</p>
             </div>
           </div>
-          <button 
-            onClick={() => setShowManualForm(!showManualForm)}
-            className="text-xs text-indigo-400 hover:text-indigo-300 transition underline underline-offset-4 cursor-pointer"
-          >
-            {showManualForm ? "Use conversational setup" : "Skip chat & setup manually"}
-          </button>
         </div>
 
-        {!showManualForm ? (
-          /* CONVERSATIONAL CHAT SCREEN */
-          <div className="flex-1 flex flex-col justify-between overflow-hidden">
-            {/* Scrollable messages */}
-            <div className="flex-1 overflow-y-auto space-y-4 pr-2 max-h-[60vh] md:max-h-[70vh]">
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-                  <div className={`flex gap-3 max-w-[85%] ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                      msg.sender === 'ai' ? 'bg-indigo-900/50 text-indigo-400 border border-indigo-700/30' : 'bg-cyan-900/50 text-cyan-400 border border-cyan-700/30'
-                    }`}>
-                      {msg.sender === 'ai' ? <Sparkles className="h-4 w-4" /> : <UserIcon className="h-4 w-4" />}
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <div className={`p-4 rounded-2xl text-sm leading-relaxed border ${
-                        msg.sender === 'ai' 
-                          ? 'bg-slate-900/80 border-slate-800 text-slate-100' 
-                          : 'bg-indigo-950/80 border-indigo-800/50 text-indigo-100'
-                      }`}>
-                        {msg.text}
-                      </div>
-
-                      {/* Message Options / Clickable Chips */}
-                      {msg.options && (
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {msg.options.map((opt, oIdx) => (
-                            <button
-                              key={oIdx}
-                              onClick={() => handleSend(opt)}
-                              className="text-xs bg-slate-800/80 border border-slate-700 hover:bg-indigo-900/30 hover:border-indigo-500 text-slate-300 hover:text-white px-3 py-1.5 rounded-full transition duration-200 cursor-pointer"
-                            >
-                              {opt}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Chat Input */}
-            <div className="mt-4 pt-4 border-t border-slate-800">
-              {step > 3 ? (
-                /* Generate Button State */
-                <div className="flex justify-center p-4">
-                  <button
-                    onClick={handleFinishOnboarding}
-                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white font-semibold py-4 px-8 rounded-xl shadow-xl shadow-indigo-500/20 transform hover:-translate-y-0.5 transition cursor-pointer"
-                  >
-                    Generate my learning path <ArrowRight className="h-5 w-5 animate-pulse" />
-                  </button>
-                </div>
-              ) : (
-                /* Form Input */
-                <form 
-                  onSubmit={(e) => { e.preventDefault(); handleSend(inputValue); }}
-                  className="relative flex items-center"
-                >
-                  <input
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    placeholder="Describe your learning goals..."
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-4 pr-12 py-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 shadow-inner"
-                  />
-                  <button
-                    type="submit"
-                    className="absolute right-2 p-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white transition cursor-pointer"
-                  >
-                    <Send className="h-4 w-4" />
-                  </button>
-                </form>
-              )}
-            </div>
-          </div>
-        ) : (
-          /* MANUAL FORM VIEW */
-          <form onSubmit={handleManualFormSubmit} className="flex-1 space-y-6 pt-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">My Learning Goal</label>
-              <textarea
-                value={profile.goal || ''}
-                onChange={(e) => setProfile(prev => ({ ...prev, goal: e.target.value }))}
-                required
-                rows={3}
-                placeholder="Describe what you want to learn or achieve in detail..."
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Target Domain</label>
-                <select
-                  value={profile.goal_tags?.[0] || 'Web Dev'}
-                  onChange={(e) => setProfile(prev => ({ ...prev, goal_tags: [e.target.value] }))}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 cursor-pointer"
-                >
-                  <option value="Web Dev">Web Development</option>
-                  <option value="Data Science">Data Science</option>
-                  <option value="AI/ML">Artificial Intelligence</option>
-                  <option value="Cloud/DevOps">Cloud & DevOps</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Experience Level</label>
-                <select
-                  value={profile.experience_level || 'beginner'}
-                  onChange={(e) => setProfile(prev => ({ ...prev, experience_level: e.target.value as ExperienceLevel }))}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100 cursor-pointer"
-                >
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Weekly Time Budget (Hours)</label>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={profile.time_budget_hours_per_week || 10}
-                onChange={(e) => setProfile(prev => ({ ...prev, time_budget_hours_per_week: Number(e.target.value) }))}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Focus Topics (comma separated)</label>
-              <input
-                type="text"
-                placeholder="e.g. React, Next.js, Docker, Pandas"
-                value={profile.interests?.join(', ') || ''}
-                onChange={(e) => setProfile(prev => ({ ...prev, interests: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-100"
-              />
-            </div>
-
-            <div className="flex gap-4 pt-4">
-              <button
-                type="button"
-                onClick={() => setShowManualForm(false)}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl transition cursor-pointer"
-              >
-                Back to Chat
-              </button>
-              <button
-                type="submit"
-                className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-xl shadow-lg transition cursor-pointer"
-              >
-                Generate Path
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-
-      {/* RIGHT PANEL: Live Profile Summary Card */}
-      <div className="w-full md:w-80 bg-slate-950 p-6 md:p-10 flex flex-col justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-6 flex items-center gap-2">
-            <Activity className="h-4 w-4 text-cyan-400" /> Profiler Summary
-          </h2>
-
-          <div className="space-y-6">
-            {/* Goal Tag */}
-            <div>
-              <span className="text-xs text-slate-500 block mb-1">Target Field</span>
-              <div className="text-sm font-semibold text-slate-200">
-                {profile.goal_tags?.[0] || 'Unselected'}
-              </div>
-            </div>
-
-            {/* Inferred Goal */}
-            <div>
-              <span className="text-xs text-slate-500 block mb-1">Learning Goal</span>
-              <p className="text-sm font-medium text-slate-300 italic">
-                {profile.goal ? `"${profile.goal}"` : 'Awaiting goal description...'}
+        {/* VISIBLE ERROR BANNER (NO SILENT FALLBACKS) */}
+        {errorMessage && (
+          <div className="mb-4 bg-rose-950/80 border border-rose-700/80 text-rose-200 rounded-2xl p-4 flex items-start gap-3 shadow-xl animate-fade-in">
+            <AlertTriangle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
+            <div className="space-y-1 text-xs">
+              <div className="font-bold text-sm text-rose-300">Gemini API Error</div>
+              <p className="leading-relaxed">{errorMessage}</p>
+              <p className="text-[11px] text-rose-400 mt-1">
+                Please make sure your <strong>GEMINI_API_KEY</strong> is set in the <code>.env</code> file in the project directory and the backend server is running.
               </p>
             </div>
+          </div>
+        )}
 
-            {/* Experience Level */}
-            <div>
-              <span className="text-xs text-slate-500 block mb-1">Experience Level</span>
-              <div className="flex items-center gap-2 mt-1">
-                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider ${
-                  profile.experience_level === 'beginner' 
-                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                    : profile.experience_level === 'intermediate'
-                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                    : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                }`}>
+        {/* CONVERSATIONAL AI CHAT INTERFACE */}
+        <div className="flex-1 flex flex-col justify-between overflow-hidden">
+          
+          {/* Scrollable Chat Window */}
+          <div className="flex-1 overflow-y-auto space-y-5 pr-2 max-h-[58vh] sm:max-h-[64vh] scrollbar-thin">
+            {messages.map((msg) => (
+              <div 
+                key={msg.id} 
+                className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
+              >
+                <div className={`flex gap-3 max-w-[90%] sm:max-w-[80%] ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+                  {/* Avatar */}
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-md ${
+                    msg.sender === 'ai' 
+                      ? 'bg-indigo-900/60 text-cyan-300 border border-indigo-700/40' 
+                      : 'bg-cyan-950 text-cyan-300 border border-cyan-700/40'
+                  }`}>
+                    {msg.sender === 'ai' ? <Brain className="h-4 w-4" /> : <UserIcon className="h-4 w-4" />}
+                  </div>
+
+                  {/* Message Bubble */}
+                  <div className="flex flex-col gap-2.5">
+                    <div className={`p-4 rounded-2xl text-xs sm:text-sm leading-relaxed border whitespace-pre-line ${
+                      msg.sender === 'ai' 
+                        ? 'bg-slate-900/90 border-slate-800/90 text-slate-200 shadow-lg' 
+                        : 'bg-gradient-to-r from-indigo-600 to-indigo-700 border-indigo-500/40 text-white shadow-lg'
+                    }`}>
+                      {msg.text}
+                    </div>
+
+                    {/* Interactive Suggestion Chips */}
+                    {msg.options && msg.options.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {msg.options.map((opt, oIdx) => (
+                          <button
+                            key={oIdx}
+                            onClick={() => handleSend(opt)}
+                            disabled={isTyping || isGeneratingPath}
+                            className="text-xs bg-slate-900/80 border border-slate-800 hover:border-indigo-500 hover:bg-indigo-950/40 text-slate-300 hover:text-white px-3.5 py-1.5 rounded-full transition duration-200 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                          >
+                            <Sparkles className="h-3 w-3 text-cyan-400" />
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Typing Indicator */}
+            {isTyping && (
+              <div className="flex justify-start animate-fade-in">
+                <div className="flex gap-3 items-center">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-950 border border-indigo-800/50 flex items-center justify-center text-cyan-400">
+                    <Brain className="h-4 w-4 animate-spin-slow" />
+                  </div>
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-3 text-xs text-slate-400 flex items-center gap-2">
+                    <span className="inline-block w-2 h-2 rounded-full bg-indigo-400 animate-bounce"></span>
+                    <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-bounce delay-100"></span>
+                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-bounce delay-200"></span>
+                    <span className="text-xs text-slate-400 ml-1">Calling live Gemini 2.0 API...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input Bar */}
+          <div className="pt-4 border-t border-slate-800/80">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSend();
+              }}
+              className="flex gap-2 relative"
+            >
+              <input
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Ask any question or specify your learning goals..."
+                disabled={isTyping || isGeneratingPath}
+                className="flex-1 bg-slate-900/90 border border-slate-700/80 focus:border-indigo-500 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none transition shadow-inner"
+              />
+              <button
+                type="submit"
+                disabled={!inputValue.trim() || isTyping || isGeneratingPath}
+                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition duration-200 cursor-pointer flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Send className="h-4 w-4" />
+                <span className="hidden sm:inline">Send</span>
+              </button>
+            </form>
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* RIGHT REAL-TIME BLUEPRINT SYNTHESIS SIDEBAR */}
+      <div className="w-full lg:w-96 p-6 sm:p-8 bg-slate-950/80 border-t lg:border-t-0 border-slate-800/80 flex flex-col justify-between space-y-6">
+        
+        <div className="space-y-6">
+          {/* Blueprint Title */}
+          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div className="flex items-center gap-2 text-white font-bold text-sm">
+              <Brain className="h-4 w-4 text-cyan-400" />
+              <span>Live Profile Blueprint</span>
+            </div>
+            <span className="text-[10px] bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Gemini Live
+            </span>
+          </div>
+
+          {/* Extracted Fields */}
+          <div className="space-y-4">
+            
+            {/* Goal Card */}
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 space-y-1.5">
+              <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Compass className="h-3.5 w-3.5 text-indigo-400" /> Target Goal
+              </div>
+              <div className="text-sm font-semibold text-white">
+                {profile.goal ? `"${profile.goal}"` : <span className="text-slate-500 italic">Listening to chat...</span>}
+              </div>
+            </div>
+
+            {/* Domain & Level */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-3.5 space-y-1">
+                <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                  Domain Track
+                </div>
+                <div className="text-xs font-bold text-cyan-300 truncate">
+                  {profile.goal_tags[0] || 'Auto-detecting...'}
+                </div>
+              </div>
+
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-3.5 space-y-1">
+                <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                  Skill Level
+                </div>
+                <div className="text-xs font-bold text-indigo-300 capitalize">
                   {profile.experience_level}
-                </span>
+                </div>
               </div>
             </div>
 
-            {/* Time Budget */}
-            <div>
-              <span className="text-xs text-slate-500 block mb-1">Time Availability</span>
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
-                <Clock className="h-4 w-4 text-slate-400" />
-                {profile.time_budget_hours_per_week} hours / week
+            {/* Time Commitment */}
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-cyan-400" />
+                <span className="text-xs text-slate-300 font-medium">Weekly Time Budget:</span>
               </div>
+              <span className="text-xs font-bold text-white bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700">
+                {profile.time_budget_hours_per_week} hrs/week
+              </span>
             </div>
 
-            {/* Focus Interests */}
-            <div>
-              <span className="text-xs text-slate-500 block mb-1">Focus Topics</span>
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {profile.interests && profile.interests.length > 0 ? (
-                  profile.interests.map((tag, i) => (
-                    <span key={i} className="text-xs bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded">
+            {/* Topics / Interests Identified */}
+            {profile.interests && profile.interests.length > 0 && (
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 space-y-2">
+                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  Key Technologies & Skills
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.interests.map((tag, idx) => (
+                    <span
+                      key={idx}
+                      className="text-[11px] bg-indigo-950/70 border border-indigo-800/50 text-indigo-200 px-2.5 py-1 rounded-lg"
+                    >
                       {tag}
                     </span>
-                  ))
-                ) : (
-                  <span className="text-xs text-slate-600">None selected</span>
-                )}
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 4-Stage Structure Preview */}
+            <div className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4 space-y-2.5">
+              <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Zap className="h-3.5 w-3.5 text-amber-400" /> 4-Stage Structure
+              </div>
+              <div className="space-y-1.5 text-[11px] text-slate-400">
+                <div className="flex items-center gap-2 text-slate-300">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400"></span> 1. Foundations & Primitives
+                </div>
+                <div className="flex items-center gap-2 text-slate-300">
+                  <span className="w-2 h-2 rounded-full bg-indigo-400"></span> 2. Core Competencies & Architecture
+                </div>
+                <div className="flex items-center gap-2 text-slate-300">
+                  <span className="w-2 h-2 rounded-full bg-violet-400"></span> 3. Applied Real-World Systems
+                </div>
+                <div className="flex items-center gap-2 text-slate-300">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span> 4. Flagship Capstone Portfolio
+                </div>
               </div>
             </div>
+
           </div>
         </div>
 
-        <div className="mt-10 pt-4 border-t border-slate-800 text-xs text-slate-500 flex flex-col gap-2">
-          <div className="flex items-center gap-1.5">
-            <BookOpen className="h-3.5 w-3.5 text-slate-400" />
-            Generating 4-stage roadmaps
-          </div>
-          <div>All roadmaps are interactive and adapt live to user progress or feedback.</div>
+        {/* GENERATE ROADMAP CTA */}
+        <div className="pt-4 border-t border-slate-800 space-y-3">
+          <button
+            onClick={handleGenerateRoadmap}
+            disabled={isGeneratingPath || isTyping}
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white font-bold text-sm shadow-xl shadow-indigo-600/35 hover:shadow-indigo-600/50 hover:scale-[1.02] active:scale-[0.98] transition duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isGeneratingPath ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Calling Gemini API & Saving to DB...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 text-cyan-300" />
+                <span>Generate Custom AI Roadmap</span>
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </button>
+
+          <p className="text-[11px] text-center text-slate-500">
+            Roadmap adapts dynamically as you complete or skip modules.
+          </p>
         </div>
+
       </div>
-      
+
     </div>
   );
 }

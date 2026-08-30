@@ -3,21 +3,21 @@ import {
   Play, CheckCircle, Lock, Unlock, Sparkles, AlertCircle, X, SkipForward
 } from 'lucide-react';
 import type { LearningPath, PathItem, Course, FeedbackType } from '../types';
-import { MOCK_COURSES } from '../mockData';
 
 
 interface RoadmapViewProps {
   learningPath: LearningPath;
+  courses: Course[];
   onItemStatusChange: (itemId: string, status: PathItem['status']) => void;
   onFeedback: (itemId: string, feedback: FeedbackType) => void;
 }
 
-export default function RoadmapView({ learningPath, onItemStatusChange, onFeedback }: RoadmapViewProps) {
+export default function RoadmapView({ learningPath, courses, onItemStatusChange, onFeedback }: RoadmapViewProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'course' | 'project' | 'assessment'>('all');
 
   const courseMap = new Map<string, Course>();
-  MOCK_COURSES.forEach(c => courseMap.set(c.id, c));
+  courses.forEach(c => courseMap.set(c.id, c));
 
   const selectedItem = selectedItemId ? courseMap.get(selectedItemId) : null;
   const selectedPathItem = selectedItemId 
