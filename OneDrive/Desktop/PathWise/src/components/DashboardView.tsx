@@ -3,12 +3,11 @@ import {
 } from 'recharts';
 import { Award, BookOpen, Activity, Zap } from 'lucide-react';
 import type { LearningPath, User, FeedbackEvent, Course } from '../types';
-import { MOCK_COURSES } from '../mockData';
-
 
 interface DashboardViewProps {
   user: User;
   learningPath: LearningPath;
+  courses: Course[];
   feedbackLog: FeedbackEvent[];
   onStartItem: (itemId: string) => void;
   onCompleteItem: (itemId: string) => void;
@@ -17,13 +16,14 @@ interface DashboardViewProps {
 export default function DashboardView({ 
   user, 
   learningPath, 
+  courses,
   feedbackLog, 
   onStartItem, 
   onCompleteItem 
 }: DashboardViewProps) {
 
   const courseMap = new Map<string, Course>();
-  MOCK_COURSES.forEach(c => courseMap.set(c.id, c));
+  courses.forEach(c => courseMap.set(c.id, c));
 
   // 1. Progress stats
   const allItems = learningPath.stages.flatMap(s => s.items);
